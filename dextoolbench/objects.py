@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple
@@ -194,3 +195,63 @@ BRUSH_NAME_TO_OBJECT = {
     ),
 }
 NAME_TO_OBJECT.update(BRUSH_NAME_TO_OBJECT)
+
+
+FABRICA_ASSETS_DIR = get_repo_root_dir() / "assets" / "urdf" / "fabrica"
+
+
+def _get_fabrica_assemblies() -> Tuple[str, ...]:
+    return tuple(
+        sorted(
+            path.parent.name
+            for path in FABRICA_ASSETS_DIR.glob("*/canonical_transforms.json")
+        )
+    )
+
+
+def _load_fabrica_objects(assembly_name: str) -> Dict[str, Object]:
+    transforms_path = FABRICA_ASSETS_DIR / assembly_name / "canonical_transforms.json"
+    if not transforms_path.exists():
+        return {}
+
+    with open(transforms_path) as f:
+        transforms = json.load(f)
+
+    objects = {}
+    for pid, data in transforms.items():
+        name = f"{assembly_name}_{pid}"
+        part_dir = FABRICA_ASSETS_DIR / assembly_name / pid
+        scale = rescale_by_factor(tuple(data["canonical_extents"]), factor=25)
+
+        urdf_path = part_dir / f"{name}.urdf"
+        if urdf_path.exists():
+            objects[name] = Object(
+                urdf_path=urdf_path,
+                scale=scale,
+                need_vhacd=True,
+            )
+
+        sdf_urdf_path = part_dir / f"{name}_sdf.urdf"
+        if sdf_urdf_path.exists():
+            objects[f"{name}_sdf"] = Object(
+                urdf_path=sdf_urdf_path,
+                scale=scale,
+                need_vhacd=False,
+            )
+
+        coacd_urdf_path = part_dir / "coacd" / f"{name}_coacd.urdf"
+        if coacd_urdf_path.exists():
+            objects[f"{name}_coacd"] = Object(
+                urdf_path=coacd_urdf_path,
+                scale=scale,
+                need_vhacd=False,
+            )
+
+    return objects
+
+
+FABRICA_NAME_TO_OBJECT = {}
+for _assembly_name in _get_fabrica_assemblies():
+    FABRICA_NAME_TO_OBJECT.update(_load_fabrica_objects(_assembly_name))
+
+NAME_TO_OBJECT.update(FABRICA_NAME_TO_OBJECT)
