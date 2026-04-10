@@ -290,7 +290,21 @@ def main():
         / args.object_name
         / f"{args.task_name}.json"
     )
-    assert trajectory_path.exists(), f"Trajectory file not found: {trajectory_path}"
+    if not trajectory_path.exists():
+        # See if it's a fabrica trajectory
+        print(f"Trajectory file not found: {trajectory_path}, trying fabrica trajectory")
+        trajectory_path = (
+            get_repo_root_dir()
+            / "assets/urdf/fabrica"
+            / args.object_category
+            / "trajectories"
+            / args.object_name
+            / f"{args.task_name}.json"
+        )
+        print(f"Fabrica trajectory path: {trajectory_path}")
+        assert trajectory_path.exists(), f"Trajectory file not found: {trajectory_path}"
+
+    # assert trajectory_path.exists(), f"Trajectory file not found: {trajectory_path}"
     with open(trajectory_path) as f:
         traj_data = json.load(f)
 
@@ -300,6 +314,12 @@ def main():
         [x, y - 0.8, z, qx, qy, qz, qw]
         for x, y, z, qx, qy, qz, qw in goal_poses_world_frame
     ]
+
+    # Adjustments
+    # goal_poses_robot_frame = [
+    #     [x - 0.05, y, z, qx, qy, qz, qw]
+    #     for x, y, z, qx, qy, qz, qw in goal_poses_robot_frame
+    # ]
 
     try:
         # Create and run the GoalPoseNode
